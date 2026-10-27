@@ -11,6 +11,15 @@ Local pass-and-play tic tac toe in Rust + Macroquad, with a twist: each player m
 - When you have 3 marks, your oldest is drawn faded so you can see what will vanish.
 - Tap/click after a win to play again.
 
+## Online play
+Tap **Host an online game** on one phone and **Join an online game** on the other. The host gets a code to send to the friend (any chat app works), the friend pastes it and sends a reply code back, and the host pastes that. The two browsers then connect directly (WebRTC), with no game server. The host plays X, and sides swap on each rematch.
+
+How it fits together:
+- `web/online.js` makes the codes and the data channel. Each message is a cell number 0-8, or 9 for a rematch.
+- `src/net.rs` lets the Rust game read that state. On desktop it is a stub, so desktop is local play only.
+- Both players run the same rules in `src/game.rs`, so the boards stay identical; each side only accepts taps on its own turn.
+- It uses Google's public STUN server (`stun.l.google.com`) to find a route between the phones. Moves never go through it. Some mobile or strict networks block direct connections; that would need a relay server.
+
 ## Desktop
     cargo run --release
 Works on macOS, Windows and Linux.
@@ -24,7 +33,7 @@ Works on macOS, Windows and Linux.
     cp target/wasm32-unknown-unknown/release/vanishing-ttt.wasm web/vanishing_ttt.wasm
     cd web && python3 -m http.server   # open http://localhost:8000
 
-`web/mq_js_bundle.js` is the official Macroquad loader. For a single-file build run
+`web/mq_js_bundle.js` is the official Macroquad loader (with a one-line strict-mode fix) and `web/online.js` adds online play. For a single-file build run
 `python3 make_standalone.py` (after copying the wasm) to produce `web/standalone.html`.
 GitHub Pages serves `docs/index.html`, which is a copy of that file; copy it over after each web build.
 

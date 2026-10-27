@@ -1,4 +1,5 @@
 mod game;
+mod net;
 
 use game::{Game, Player};
 use macroquad::prelude::*;
@@ -119,15 +120,55 @@ fn pointer_pressed() -> Option<(f32, f32)> {
     None
 }
 
+/// The game plus the animation state that goes with it.
+struct Session {
+    game: Game,
+    /// When each cell's current mark was placed, for the pop-in animation.
+    placed_at: [f64; 9],
+    /// A mark that just vanished: (cell, owner, time removed).
+    ghost: Option<(usize, Player, f64)>,
+    won_at: f64,
+}
+
+impl Session {
+    fn new() -> Self {
+        Session {
+            game: Game::new(),
+            placed_at: [f64::MIN; 9],
+            ghost: None,
+            won_at: 0.0,
+        }
+    }
+
+    fn reset(&mut self) {
+        *self = Session::new();
+    }
+
+    /// Plays `idx` for the player whose turn it is. Returns false if the move is illegal.
+    fn play(&mut self, idx: usize, now: f64) -> bool {
+        let mover = self.game.turn;
+        let vanishing = self.game.oldest_to_vanish();
+        if self.game.play(idx).is_err() {
+            return false;
+        }
+        self.placed_at[idx] = now;
+        if let Some(old) = vanishing.filter(|&old| old != idx) {
+            self.ghost = Some((old, mover, now));
+        }
+        if self.game.winner.is_some() {
+            self.won_at = now;
+        }
+        true
+    }
+}
+
 #[macroquad::main(window_conf)]
 async fn main() {
     let font = load_ttf_font_from_bytes(include_bytes!("../assets/Inter-SemiBold.otf")).ok();
-    let mut game = Game::new();
-    // When each cell's current mark was placed, for the pop-in animation.
-    let mut placed_at = [f64::MIN; 9];
-    // A mark that just vanished: (cell, owner, time removed).
-    let mut ghost: Option<(usize, Player, f64)> = None;
-    let mut won_at = 0.0;
+    let mut s = Session::new();
+    // Online play: the side this device controls, and whether we were connected last frame.
+    let mut me: Option<Player> = None;
+    let mut was_online = false;
 
     loop {
         let now = get_time();
@@ -145,25 +186,51 @@ async fn main() {
             )
         };
 
+        // Connection changes: a fresh online game starts from an empty board.
+        let online = net::connected();
+        if online && !was_online {
+            s.reset();
+            me = net::role();
+        } else if !online {
+            me = None;
+        }
+        was_online = online;
+
+        // Moves from the other player.
+        while online {
+            match net::recv() {
+                Some(m) if m < 9 => {
+                    if Some(s.game.turn) != me {
+                        s.play(m as usize, now);
+                    }
+                }
+                Some(net::REMATCH) => {
+                    if s.game.winner.is_some() {
+                        s.reset();
+                        me = me.map(Player::other);
+                    }
+                }
+                Some(_) => {}
+                None => break,
+            }
+        }
+
         // Input
         if let Some((px, py)) = pointer_pressed() {
-            if game.winner.is_some() {
-                game.reset();
-                placed_at = [f64::MIN; 9];
-                ghost = None;
+            if s.game.winner.is_some() {
+                s.reset();
+                if online {
+                    // Swap sides so the same player doesn't always start.
+                    me = me.map(Player::other);
+                    net::send(net::REMATCH);
+                }
             } else if px >= bx && px < bx + side && py >= by && py < by + side {
                 let c = ((px - bx) / cell) as usize;
                 let r = ((py - by) / cell) as usize;
                 let idx = r.min(2) * 3 + c.min(2);
-                let mover = game.turn;
-                let vanishing = game.oldest_to_vanish();
-                if game.play(idx).is_ok() {
-                    placed_at[idx] = now;
-                    if let Some(old) = vanishing.filter(|&old| old != idx) {
-                        ghost = Some((old, mover, now));
-                    }
-                    if game.winner.is_some() {
-                        won_at = now;
+                if !online || Some(s.game.turn) == me {
+                    if s.play(idx, now) && online {
+                        net::send(idx as u8);
                     }
                 }
             }
@@ -179,10 +246,10 @@ async fn main() {
         }
 
         // Mark that just vanished: shrinks and fades out.
-        if let Some((i, p, t0)) = ghost {
+        if let Some((i, p, t0)) = s.ghost {
             let t = ((now - t0) / VANISH_TIME) as f32;
             if t >= 1.0 {
-                ghost = None;
+                s.ghost = None;
             } else {
                 let (cx, cy) = center(i);
                 draw_mark(p, cx, cy, cell, 1.0 - 0.4 * t, faded(col(p), 0.6 + 0.4 * t), thick);
@@ -190,15 +257,15 @@ async fn main() {
         }
 
         // Marks. The oldest mark of the player to move pulses faintly as a warning.
-        let fading = if game.winner.is_none() { game.oldest_to_vanish() } else { None };
+        let fading = if s.game.winner.is_none() { s.game.oldest_to_vanish() } else { None };
         let pulse = 0.5 + 0.5 * (now * 4.0).sin() as f32;
-        for (i, c) in game.cells.iter().enumerate() {
+        for (i, c) in s.game.cells.iter().enumerate() {
             if let Some(p) = *c {
                 let (cx, cy) = center(i);
-                let scale = ease_out_back(((now - placed_at[i]) / POP_TIME) as f32);
+                let scale = ease_out_back(((now - s.placed_at[i]) / POP_TIME) as f32);
                 let color = if fading == Some(i) {
                     faded(col(p), 0.55 + 0.15 * pulse)
-                } else if game.winner.is_some_and(|(_, line)| !line.contains(&i)) {
+                } else if s.game.winner.is_some_and(|(_, line)| !line.contains(&i)) {
                     faded(col(p), 0.6)
                 } else {
                     col(p)
@@ -208,8 +275,8 @@ async fn main() {
         }
 
         // Winning line, drawn from end to end.
-        if let Some((_, line)) = game.winner {
-            let t = (((now - won_at) / WIN_LINE_TIME) as f32).clamp(0.0, 1.0);
+        if let Some((_, line)) = s.game.winner {
+            let t = (((now - s.won_at) / WIN_LINE_TIME) as f32).clamp(0.0, 1.0);
             let t = 1.0 - (1.0 - t) * (1.0 - t);
             let (a, b) = (center(line[0]), center(line[2]));
             let (dx, dy) = (b.0 - a.0, b.1 - a.1);
@@ -221,22 +288,29 @@ async fn main() {
         }
 
         // Text
-        let title = match game.winner {
-            Some((p, _)) => format!("{} wins!", name(p)),
-            None => format!("{}'s turn", name(game.turn)),
+        let (title, tc) = match s.game.winner {
+            Some((p, _)) if online => {
+                (if Some(p) == me { "You win!" } else { "You lose" }.to_owned(), col(p))
+            }
+            Some((p, _)) => (format!("{} wins!", name(p)), col(p)),
+            None if online => {
+                let t = if Some(s.game.turn) == me { "Your turn" } else { "Opponent's turn" };
+                (t.to_owned(), col(s.game.turn))
+            }
+            None => (format!("{}'s turn", name(s.game.turn)), col(s.game.turn)),
         };
-        let tc = col(game.winner.map(|w| w.0).unwrap_or(game.turn));
         let ts = (side * 0.11).max(22.0);
         let hs = (side * 0.045).max(13.0);
         let title_y = (by - ts * 1.3).max(ts);
         centered_text(font.as_ref(), &title, sw / 2.0, title_y, ts, tc);
         // Kept short: a long title runs off the edge of narrow phone screens.
-        let hint = if game.winner.is_some() {
-            "Tap to play again"
-        } else {
-            "Max 3 marks each - the oldest vanishes"
+        let hint = match (s.game.winner.is_some(), me) {
+            (true, _) if online => "Tap for a rematch".to_owned(),
+            (true, _) => "Tap to play again".to_owned(),
+            (false, Some(p)) => format!("You are {} - oldest of 3 marks vanishes", name(p)),
+            (false, None) => "Max 3 marks each - the oldest vanishes".to_owned(),
         };
-        centered_text(font.as_ref(), hint, sw / 2.0, title_y + hs * 1.9, hs, HINT);
+        centered_text(font.as_ref(), &hint, sw / 2.0, title_y + hs * 1.9, hs, HINT);
 
         next_frame().await;
     }
