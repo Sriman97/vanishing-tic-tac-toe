@@ -53,10 +53,6 @@ impl Game {
         }
     }
 
-    pub fn reset(&mut self) {
-        *self = Game::new();
-    }
-
     fn history(&self, p: Player) -> &VecDeque<usize> {
         match p {
             Player::X => &self.history_x,
@@ -192,7 +188,7 @@ mod tests {
         assert!(g.winner.is_some());
         assert!(g.play(8).is_err());
         assert_eq!(g.cells[8], None);
-        g.reset();
+        g = Game::new();
         assert!(g.winner.is_none());
         g.play(8).unwrap();
     }
