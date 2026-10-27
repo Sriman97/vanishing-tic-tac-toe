@@ -174,9 +174,19 @@ async fn main() {
         let now = get_time();
         clear_background(BG);
         let (sw, sh) = (screen_width(), screen_height());
-        let side = sw.min(sh) * 0.90;
+        // Header (title + hint) above a square board, the whole block centered.
+        // The board takes whatever height is left, so wide and short windows
+        // shrink it instead of pushing it off the screen.
+        let unit = sw.min(sh);
+        let ts = (unit * 0.09).max(22.0);
+        let hs = (unit * 0.04).max(13.0);
+        let header = ts * 1.25 + hs * 2.2;
+        let gap = unit * 0.03;
+        let side = (sw * 0.92).min(sh - header - gap - unit * 0.06).max(60.0);
+        let top = ((sh - (header + gap + side)) / 2.0).max(0.0);
+        let title_y = top + ts;
         let bx = (sw - side) / 2.0;
-        let by = (sh - side) / 2.0 + sh.min(sw) * 0.06;
+        let by = top + header + gap;
         let cell = side / 3.0;
         let thick = (side * 0.04).max(4.0);
         let center = |i: usize| {
@@ -299,9 +309,6 @@ async fn main() {
             }
             None => (format!("{}'s turn", name(s.game.turn)), col(s.game.turn)),
         };
-        let ts = (side * 0.11).max(22.0);
-        let hs = (side * 0.045).max(13.0);
-        let title_y = (by - ts * 1.3).max(ts);
         centered_text(font.as_ref(), &title, sw / 2.0, title_y, ts, tc);
         // Kept short: a long title runs off the edge of narrow phone screens.
         let hint = match (s.game.winner.is_some(), me) {
