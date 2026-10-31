@@ -28,6 +28,24 @@ const LINES: [[usize; 3]; 8] = [
 
 pub const MAX_MARKS: usize = 3;
 
+pub const MAX_NAME_LEN: usize = 10;
+
+/// Cleans a typed player name: ASCII printable only, trimmed, at most
+/// MAX_NAME_LEN characters. Returns `fallback` if nothing is left.
+pub fn clean_name(raw: &str, fallback: &str) -> String {
+    let kept: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_graphic() || *c == ' ')
+        .collect();
+    let cut: String = kept.trim_matches(' ').chars().take(MAX_NAME_LEN).collect();
+    let cut = cut.trim_end_matches(' ');
+    if cut.is_empty() {
+        fallback.to_string()
+    } else {
+        cut.to_string()
+    }
+}
+
 pub struct Game {
     pub cells: [Option<Player>; 9],
     pub history_x: VecDeque<usize>,
@@ -215,5 +233,20 @@ mod tests {
         g.play(4).unwrap();
         assert_eq!(g.cells[0], None);
         assert!(g.winner.is_none());
+    }
+
+    #[test]
+    fn clean_name_falls_back_when_empty() {
+        assert_eq!(clean_name("", "X"), "X");
+        assert_eq!(clean_name("   ", "O"), "O");
+        assert_eq!(clean_name("\u{1F600}", "X"), "X");
+    }
+
+    #[test]
+    fn clean_name_trims_filters_and_caps() {
+        assert_eq!(clean_name("  Sam  ", "X"), "Sam");
+        assert_eq!(clean_name("Zoë", "X"), "Zo");
+        assert_eq!(clean_name("Abcdefghijklmnop", "X"), "Abcdefghij");
+        assert_eq!(clean_name("Abcdefghi jkl", "X"), "Abcdefghi");
     }
 }

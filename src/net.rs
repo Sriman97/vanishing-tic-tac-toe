@@ -14,6 +14,8 @@ mod imp {
         fn vttt_role() -> i32;
         fn vttt_recv() -> i32;
         fn vttt_send(v: i32);
+        fn vttt_name_len(p: i32) -> i32;
+        fn vttt_name_char(p: i32, i: i32) -> i32;
     }
 
     // Lets the JS loader check that its plugin version matches this crate.
@@ -34,6 +36,15 @@ mod imp {
     pub fn send(v: i32) {
         unsafe { vttt_send(v) }
     }
+    pub fn raw_name(p: i32) -> String {
+        let len = unsafe { vttt_name_len(p) };
+        (0..len.max(0))
+            .filter_map(|i| {
+                let c = unsafe { vttt_name_char(p, i) };
+                if (0..=127).contains(&c) { Some(c as u8 as char) } else { None }
+            })
+            .collect()
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -48,6 +59,9 @@ mod imp {
         -1
     }
     pub fn send(_v: i32) {}
+    pub fn raw_name(_p: i32) -> String {
+        String::new()
+    }
 }
 
 /// True while an online game is connected.
@@ -71,4 +85,12 @@ pub fn recv() -> Option<u8> {
 
 pub fn send(v: u8) {
     imp::send(i32::from(v));
+}
+
+/// Raw player name typed on the home screen (empty on desktop).
+pub fn raw_name(p: Player) -> String {
+    imp::raw_name(match p {
+        Player::X => 0,
+        Player::O => 1,
+    })
 }
