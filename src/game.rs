@@ -234,4 +234,19 @@ mod tests {
         assert_eq!(g.cells[0], None);
         assert!(g.winner.is_none());
     }
+
+    #[test]
+    fn clean_name_falls_back_when_empty() {
+        assert_eq!(clean_name("", "X"), "X");
+        assert_eq!(clean_name("   ", "O"), "O");
+        assert_eq!(clean_name("\u{1F600}", "X"), "X");
+    }
+
+    #[test]
+    fn clean_name_trims_filters_and_caps() {
+        assert_eq!(clean_name("  Sam  ", "X"), "Sam");
+        assert_eq!(clean_name("Zoë", "X"), "Zo");
+        assert_eq!(clean_name("Abcdefghijklmnop", "X"), "Abcdefghij");
+        assert_eq!(clean_name("Abcdefghi jkl", "X"), "Abcdefghi");
+    }
 }
