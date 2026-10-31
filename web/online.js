@@ -9,6 +9,7 @@
   // status: 0 = local play, 1 = connecting, 2 = connected, 3 = connection lost.
   // role: 1 = X (host), 2 = O (guest). Messages are cell numbers 0-8, or 9 for a rematch.
   const net = { status: 0, role: 0, inbox: [] };
+  const names = ["", ""];
   let pc = null;
   let dc = null;
   let hosting = false;
@@ -20,6 +21,11 @@
       imp.env.vttt_status = () => net.status;
       imp.env.vttt_role = () => net.role;
       imp.env.vttt_recv = () => (net.inbox.length ? net.inbox.shift() : -1);
+      imp.env.vttt_name_len = (p) => (names[p] || "").length;
+      imp.env.vttt_name_char = (p, i) => {
+        const s = names[p] || "";
+        return i >= 0 && i < s.length ? s.charCodeAt(i) : -1;
+      };
       imp.env.vttt_send = (v) => {
         if (dc && dc.readyState === "open") dc.send(String(v));
       };
@@ -204,7 +210,20 @@
     const canShare = typeof navigator.share === "function";
     for (const b of document.querySelectorAll(".share")) b.hidden = !canShare;
 
+    try {
+      const saved = JSON.parse(localStorage.getItem("vttt_names"));
+      if (Array.isArray(saved)) {
+        if (typeof saved[0] === "string") $("nameX").value = saved[0];
+        if (typeof saved[1] === "string") $("nameO").value = saved[1];
+      }
+    } catch (_) {}
+
     $("btnLocal").onclick = () => {
+      names[0] = $("nameX").value;
+      names[1] = $("nameO").value;
+      try {
+        localStorage.setItem("vttt_names", JSON.stringify(names));
+      } catch (_) {}
       teardown();
       hide();
     };

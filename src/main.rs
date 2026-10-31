@@ -297,17 +297,23 @@ async fn main() {
             stroke(sx, sy, sx + (ex - sx) * t, sy + (ey - sy) * t, thick * 0.9, WHITE);
         }
 
+        let names = [
+            game::clean_name(&net::raw_name(Player::X), "X"),
+            game::clean_name(&net::raw_name(Player::O), "O"),
+        ];
+        let pname = |p: Player| names[if p == Player::X { 0 } else { 1 }].clone();
+
         // Text
         let (title, tc) = match s.game.winner {
             Some((p, _)) if online => {
                 (if Some(p) == me { "You win!" } else { "You lose" }.to_owned(), col(p))
             }
-            Some((p, _)) => (format!("{} wins!", name(p)), col(p)),
+            Some((p, _)) => (format!("{} wins!", pname(p)), col(p)),
             None if online => {
                 let t = if Some(s.game.turn) == me { "Your turn" } else { "Opponent's turn" };
                 (t.to_owned(), col(s.game.turn))
             }
-            None => (format!("{}'s turn", name(s.game.turn)), col(s.game.turn)),
+            None => (format!("{}'s turn", pname(s.game.turn)), col(s.game.turn)),
         };
         centered_text(font.as_ref(), &title, sw / 2.0, title_y, ts, tc);
         // Kept short: a long title runs off the edge of narrow phone screens.

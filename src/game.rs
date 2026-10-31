@@ -28,6 +28,24 @@ const LINES: [[usize; 3]; 8] = [
 
 pub const MAX_MARKS: usize = 3;
 
+pub const MAX_NAME_LEN: usize = 10;
+
+/// Cleans a typed player name: ASCII printable only, trimmed, at most
+/// MAX_NAME_LEN characters. Returns `fallback` if nothing is left.
+pub fn clean_name(raw: &str, fallback: &str) -> String {
+    let kept: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_graphic() || *c == ' ')
+        .collect();
+    let cut: String = kept.trim_matches(' ').chars().take(MAX_NAME_LEN).collect();
+    let cut = cut.trim_end_matches(' ');
+    if cut.is_empty() {
+        fallback.to_string()
+    } else {
+        cut.to_string()
+    }
+}
+
 pub struct Game {
     pub cells: [Option<Player>; 9],
     pub history_x: VecDeque<usize>,

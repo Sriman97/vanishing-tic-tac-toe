@@ -24,6 +24,9 @@ canvas{display:block}
 .panel textarea{width:100%;box-sizing:border-box;height:6.5rem;resize:none;border:1px solid #4a4a6e;border-radius:10px;
   background:#23233c;color:#e8e8f4;padding:10px;font:13px/1.35 ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
 .panel textarea:focus{outline:2px solid #4ecdc4;outline-offset:1px}
+.panel input[type=text]{width:100%;box-sizing:border-box;border:1px solid #4a4a6e;border-radius:10px;
+  background:#23233c;color:#e8e8f4;padding:10px;font-size:16px;line-height:1.35;font-family:inherit}
+.panel input[type=text]:focus{outline:2px solid #4ecdc4;outline-offset:1px}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 button{font:inherit;font-weight:600;border:0;border-radius:12px;padding:14px 16px;min-height:48px;cursor:pointer;
   background:#34345a;color:#e8e8f4}
@@ -47,6 +50,14 @@ button.grow{flex:1 1 8rem}
   <div class="panel" id="v-home">
     <h1>Vanishing Tic Tac Toe</h1>
     <p>Each player keeps at most three marks. Place a fourth and your oldest one vanishes.</p>
+    <div class="step">
+      <label for="nameX">Player X</label>
+      <input id="nameX" type="text" maxlength="10" placeholder="X" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
+    </div>
+    <div class="step">
+      <label for="nameO">Player O</label>
+      <input id="nameO" type="text" maxlength="10" placeholder="O" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
+    </div>
     <button id="btnLocal" class="primary" type="button">Play on this device</button>
     <button id="btnHost" class="teal" type="button">Host an online game</button>
     <button id="btnJoin" type="button">Join an online game</button>
