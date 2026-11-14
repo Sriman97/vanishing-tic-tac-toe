@@ -266,6 +266,10 @@
       };
     }
     $("menuBtn").onclick = () => show("home");
+    // The game loader listens for copy, cut and paste on the whole window and cancels
+    // them to feed its own clipboard. Keep those events inside the menu so the code
+    // boxes can be pasted into and copied from.
+    for (const type of ["copy", "cut", "paste"]) $("menu").addEventListener(type, (e) => e.stopPropagation());
     show("home");
   }
 
